@@ -1,33 +1,59 @@
-
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Maze Multiplayer</title>
-  <link rel="stylesheet" href="style.css" />
-
-  <!-- Firebase Compat SDK -->
-  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-database-compat.js"></script>
-
-  <script>
-    const firebaseConfig = {
-      apiKey: "AIzaSyAubP97xh0Irg-V257r6LrPIVqIn5w6Afc",
-      authDomain: "maze-multiplayer.firebaseapp.com",
-      databaseURL: "https://maze-multiplayer-default-rtdb.firebaseio.com",
-      projectId: "maze-multiplayer",
-      storageBucket: "maze-multiplayer.firebasestorage.app",
-      messagingSenderId: "710254402717",
-      appId: "1:710254402717:web:07b2e4e7ee6fd7f02ec874",
-      measurementId: "G-HRJ3T7Y63Y"
-    };
-
-    firebase.initializeApp(firebaseConfig);
-  </script>
+  <meta charset="UTF-8">
+  <title>Socket.IO Multiplayer</title>
+  <style>
+    body { margin: 0; overflow: hidden; }
+    canvas { display: block; background: #f0f0f0; }
+  </style>
 </head>
 <body>
-  <canvas id="mazeCanvas" width="800" height="800"></canvas>
-  <script src="main.js"></script>
+  <canvas id="gameCanvas" width="600" height="600"></canvas>
+
+  <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+  <script>
+    const socket = io("https://TON-SERVEUR-RENDER-OU-RAILWAY");
+    const canvas = document.getElementById("gameCanvas");
+    const ctx = canvas.getContext("2d");
+
+    let player = {
+      id: null,
+      x: Math.floor(Math.random() * 20),
+      y: Math.floor(Math.random() * 20),
+      color: "#" + Math.floor(Math.random() * 16777215).toString(16)
+    };
+
+    let players = {};
+
+    socket.on("connect", () => {
+      player.id = socket.id;
+      socket.emit("new-player", player);
+    });
+
+    socket.on("update-players", (data) => {
+      players = data;
+      draw();
+    });
+
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "ArrowUp") player.y--;
+      if (e.key === "ArrowDown") player.y++;
+      if (e.key === "ArrowLeft") player.x--;
+      if (e.key === "ArrowRight") player.x++;
+      socket.emit("move-player", player);
+    });
+
+    function draw() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      for (let id in players) {
+        const p = players[id];
+        ctx.fillStyle = p.color;
+        ctx.beginPath();
+        ctx.arc(p.x * 30 + 15, p.y * 30 + 15, 12, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+  </script>
 </body>
 </html>
