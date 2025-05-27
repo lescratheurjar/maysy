@@ -1,0 +1,33 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Maze Multiplayer</title>
+  <link rel="stylesheet" href="style.css" />
+
+  <!-- Firebase Compat SDK -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-database-compat.js"></script>
+
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyAubP97xh0Irg-V257r6LrPIVqIn5w6Afc",
+      authDomain: "maze-multiplayer.firebaseapp.com",
+      databaseURL: "https://maze-multiplayer-default-rtdb.firebaseio.com",
+      projectId: "maze-multiplayer",
+      storageBucket: "maze-multiplayer.firebasestorage.app",
+      messagingSenderId: "710254402717",
+      appId: "1:710254402717:web:07b2e4e7ee6fd7f02ec874",
+      measurementId: "G-HRJ3T7Y63Y"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+  </script>
+</head>
+<body>
+  <canvas id="mazeCanvas" width="800" height="800"></canvas>
+  <script src="main.js"></script>
+</body>
+</html>
