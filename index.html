@@ -2,10 +2,10 @@
 <html>
 <head>
   <meta charset="UTF-8">
-  <title>Socket.IO Multiplayer</title>
+  <title>Socket.IO Maze Multiplayer</title>
   <style>
     body { margin: 0; overflow: hidden; }
-    canvas { display: block; background: #f0f0f0; }
+    canvas { display: block; background: #ffffff; }
   </style>
 </head>
 <body>
@@ -13,14 +13,110 @@
 
   <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
   <script>
-    const socket = io("maysy-production.up.railway.app");
+    const socket = io("https://TON-SERVEUR-RENDER-OU-RAILWAY");
     const canvas = document.getElementById("gameCanvas");
     const ctx = canvas.getContext("2d");
 
+    const cols = 20, rows = 20, cellSize = 30;
+    let grid = [], stack = [];
+
+    class Cell {
+      constructor(i, j) {
+        this.i = i;
+        this.j = j;
+        this.walls = [true, true, true, true];
+        this.visited = false;
+      }
+
+      draw() {
+        let x = this.i * cellSize;
+        let y = this.j * cellSize;
+        ctx.strokeStyle = "black";
+        if (this.walls[0]) ctx.strokeRect(x, y, cellSize, 0); // top
+        if (this.walls[1]) ctx.strokeRect(x + cellSize, y, 0, cellSize); // right
+        if (this.walls[2]) ctx.strokeRect(x, y + cellSize, cellSize, 0); // bottom
+        if (this.walls[3]) ctx.strokeRect(x, y, 0, cellSize); // left
+      }
+
+      checkNeighbors() {
+        let neighbors = [];
+        let top = grid[index(this.i, this.j - 1)];
+        let right = grid[index(this.i + 1, this.j)];
+        let bottom = grid[index(this.i, this.j + 1)];
+        let left = grid[index(this.i - 1, this.j)];
+
+        if (top && !top.visited) neighbors.push(top);
+        if (right && !right.visited) neighbors.push(right);
+        if (bottom && !bottom.visited) neighbors.push(bottom);
+        if (left && !left.visited) neighbors.push(left);
+
+        if (neighbors.length > 0) {
+          return neighbors[Math.floor(Math.random() * neighbors.length)];
+        }
+        return undefined;
+      }
+    }
+
+    function index(i, j) {
+      if (i < 0 || j < 0 || i >= cols || j >= rows) return -1;
+      return i + j * cols;
+    }
+
+    function removeWalls(a, b) {
+      let x = a.i - b.i;
+      let y = a.j - b.j;
+      if (x === 1) {
+        a.walls[3] = false;
+        b.walls[1] = false;
+      } else if (x === -1) {
+        a.walls[1] = false;
+        b.walls[3] = false;
+      }
+      if (y === 1) {
+        a.walls[0] = false;
+        b.walls[2] = false;
+      } else if (y === -1) {
+        a.walls[2] = false;
+        b.walls[0] = false;
+      }
+    }
+
+    // Setup maze
+    for (let j = 0; j < rows; j++) {
+      for (let i = 0; i < cols; i++) {
+        grid.push(new Cell(i, j));
+      }
+    }
+
+    let current = grid[0];
+    function generateMaze() {
+      current.visited = true;
+      let next = current.checkNeighbors();
+      if (next) {
+        next.visited = true;
+        stack.push(current);
+        removeWalls(current, next);
+        current = next;
+        setTimeout(generateMaze, 10);
+      } else if (stack.length > 0) {
+        current = stack.pop();
+        setTimeout(generateMaze, 10);
+      } else {
+        drawMaze();
+      }
+    }
+
+    function drawMaze() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      grid.forEach(cell => cell.draw());
+      drawPlayers();
+    }
+
+    // Multiplayer
     let player = {
       id: null,
-      x: Math.floor(Math.random() * 20),
-      y: Math.floor(Math.random() * 20),
+      x: 0,
+      y: 0,
       color: "#" + Math.floor(Math.random() * 16777215).toString(16)
     };
 
@@ -33,7 +129,7 @@
 
     socket.on("update-players", (data) => {
       players = data;
-      draw();
+      drawMaze();
     });
 
     document.addEventListener("keydown", (e) => {
@@ -44,16 +140,17 @@
       socket.emit("move-player", player);
     });
 
-    function draw() {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
+    function drawPlayers() {
       for (let id in players) {
         const p = players[id];
         ctx.fillStyle = p.color;
         ctx.beginPath();
-        ctx.arc(p.x * 30 + 15, p.y * 30 + 15, 12, 0, Math.PI * 2);
+        ctx.arc(p.x * cellSize + 15, p.y * cellSize + 15, 10, 0, Math.PI * 2);
         ctx.fill();
       }
     }
+
+    generateMaze();
   </script>
 </body>
 </html>
