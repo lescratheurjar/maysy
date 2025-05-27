@@ -1,127 +1,76 @@
-const canvas = document.getElementById("mazeCanvas");
-const ctx = canvas.getContext("2d");
-const rows = 20;
-const cols = 20;
-const cellSize = canvas.width / cols;
-let maze = [];
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Multiplayer Demo</title>
+  <style>
+    body { margin: 0; overflow: hidden; }
+    canvas { display: block; background: #f0f0f0; }
+  </style>
+</head>
+<body>
+  <canvas id="gameCanvas" width="600" height="600"></canvas>
 
-const db = firebase.database();
-const playerId = Math.random().toString(36).substring(2, 10);
-const playerRef = db.ref("players/" + playerId);
+  <!-- Firebase SDK -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.8.1/firebase-app.js";
+    import { getDatabase, ref, set, onValue, onDisconnect } from "https://www.gstatic.com/firebasejs/11.8.1/firebase-database.js";
 
-let player = { x: 0, y: 0, color: "#" + Math.floor(Math.random() * 16777215).toString(16) };
-playerRef.set(player);
-playerRef.onDisconnect().remove();
+    const firebaseConfig = {
+      apiKey: "AIzaSyAubP97xh0Irg-V257r6LrPIVqIn5w6Afc",
+      authDomain: "maze-multiplayer.firebaseapp.com",
+      projectId: "maze-multiplayer",
+      databaseURL: "https://maze-multiplayer-default-rtdb.firebaseio.com",
+      storageBucket: "maze-multiplayer.appspot.com",
+      messagingSenderId: "710254402717",
+      appId: "1:710254402717:web:07b2e4e7ee6fd7f02ec874",
+      measurementId: "G-HRJ3T7Y63Y"
+    };
 
-document.addEventListener("keydown", (e) => {
-  if (e.key === "ArrowUp") player.y = Math.max(0, player.y - 1);
-  else if (e.key === "ArrowDown") player.y = Math.min(rows - 1, player.y + 1);
-  else if (e.key === "ArrowLeft") player.x = Math.max(0, player.x - 1);
-  else if (e.key === "ArrowRight") player.x = Math.min(cols - 1, player.x + 1);
-  playerRef.set(player);
-});
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
 
-let allPlayers = {};
+    const canvas = document.getElementById("gameCanvas");
+    const ctx = canvas.getContext("2d");
 
-db.ref("players").on("value", (snapshot) => {
-  allPlayers = snapshot.val() || {};
-  draw();
-});
+    const playerId = Math.random().toString(36).substring(2, 10);
+    const playerRef = ref(db, "players/" + playerId);
 
-// --- Maze logic ---
-class Cell {
-  constructor(x, y) {
-    this.x = x;
-    this.y = y;
-    this.visited = false;
-    this.walls = [true, true, true, true];
-  }
+    const player = {
+      x: Math.floor(Math.random() * 20),
+      y: Math.floor(Math.random() * 20),
+      color: "#" + Math.floor(Math.random() * 16777215).toString(16)
+    };
 
-  draw() {
-    const x = this.x * cellSize;
-    const y = this.y * cellSize;
-    ctx.strokeStyle = "#000";
-    ctx.lineWidth = 2;
-    if (this.walls[0]) drawLine(x, y, x + cellSize, y);
-    if (this.walls[1]) drawLine(x + cellSize, y, x + cellSize, y + cellSize);
-    if (this.walls[2]) drawLine(x + cellSize, y + cellSize, x, y + cellSize);
-    if (this.walls[3]) drawLine(x, y + cellSize, x, y);
-  }
-}
+    set(playerRef, player);
+    onDisconnect(playerRef).remove();
 
-function drawLine(x1, y1, x2, y2) {
-  ctx.beginPath();
-  ctx.moveTo(x1, y1);
-  ctx.lineTo(x2, y2);
-  ctx.stroke();
-}
+    const allPlayers = {};
 
-function index(x, y) {
-  if (x < 0 || y < 0 || x >= cols || y >= rows) return -1;
-  return x + y * cols;
-}
+    onValue(ref(db, "players"), (snapshot) => {
+      const data = snapshot.val() || {};
+      for (let id in data) allPlayers[id] = data[id];
+      draw();
+    });
 
-function generateMaze() {
-  maze = [];
-  for (let y = 0; y < rows; y++)
-    for (let x = 0; x < cols; x++)
-      maze.push(new Cell(x, y));
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "ArrowUp") player.y -= 1;
+      if (e.key === "ArrowDown") player.y += 1;
+      if (e.key === "ArrowLeft") player.x -= 1;
+      if (e.key === "ArrowRight") player.x += 1;
+      set(playerRef, player);
+    });
 
-  let stack = [];
-  let current = maze[0];
-  current.visited = true;
-
-  function removeWalls(a, b) {
-    const dx = b.x - a.x, dy = b.y - a.y;
-    if (dx === 1) [a.walls[1], b.walls[3]] = [false, false];
-    if (dx === -1) [a.walls[3], b.walls[1]] = [false, false];
-    if (dy === 1) [a.walls[2], b.walls[0]] = [false, false];
-    if (dy === -1) [a.walls[0], b.walls[2]] = [false, false];
-  }
-
-  let total = cols * rows - 1;
-  while (total > 0) {
-    let neighbors = [];
-    let dirs = [[0,-1],[1,0],[0,1],[-1,0]];
-    for (let [dx, dy] of dirs) {
-      let nx = current.x + dx, ny = current.y + dy;
-      let ni = index(nx, ny);
-      if (ni !== -1 && !maze[ni].visited) neighbors.push(maze[ni]);
+    function draw() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      for (let id in allPlayers) {
+        const p = allPlayers[id];
+        ctx.fillStyle = p.color;
+        ctx.beginPath();
+        ctx.arc(p.x * 30 + 15, p.y * 30 + 15, 12, 0, Math.PI * 2);
+        ctx.fill();
+      }
     }
-
-    if (neighbors.length > 0) {
-      let next = neighbors[Math.floor(Math.random() * neighbors.length)];
-      stack.push(current);
-      removeWalls(current, next);
-      current = next;
-      current.visited = true;
-      total--;
-    } else {
-      current = stack.pop();
-    }
-  }
-}
-
-function drawPlayers() {
-  for (let id in allPlayers) {
-    const p = allPlayers[id];
-    ctx.fillStyle = p.color;
-    ctx.beginPath();
-    ctx.arc(
-      p.x * cellSize + cellSize / 2,
-      p.y * cellSize + cellSize / 2,
-      cellSize / 3,
-      0, Math.PI * 2
-    );
-    ctx.fill();
-  }
-}
-
-function draw() {
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-  for (let cell of maze) cell.draw();
-  drawPlayers();
-}
-
-generateMaze();
-draw();
+  </script>
+</body>
+</html>
