@@ -1,6 +1,3 @@
-
-const db = firebase.database();
-
 const canvas = document.getElementById("mazeCanvas");
 const ctx = canvas.getContext("2d");
 const rows = 20;
@@ -8,6 +5,36 @@ const cols = 20;
 const cellSize = canvas.width / cols;
 let maze = [];
 
+// Firebase Realtime Database
+const db = firebase.database();
+const playerId = Math.random().toString(36).substring(2, 10);
+const playerRef = db.ref("players/" + playerId);
+
+// Position de départ et couleur aléatoire
+let player = { x: 0, y: 0, color: "#" + Math.floor(Math.random() * 16777215).toString(16) };
+
+// Enregistrer joueur dans la DB
+playerRef.set(player);
+playerRef.onDisconnect().remove();
+
+// Déplacement clavier
+document.addEventListener("keydown", (e) => {
+  if (e.key === "ArrowUp") player.y = Math.max(0, player.y - 1);
+  else if (e.key === "ArrowDown") player.y = Math.min(rows - 1, player.y + 1);
+  else if (e.key === "ArrowLeft") player.x = Math.max(0, player.x - 1);
+  else if (e.key === "ArrowRight") player.x = Math.min(cols - 1, player.x + 1);
+  playerRef.set(player);
+});
+
+let allPlayers = {};
+
+db.ref("players").on("value", (snapshot) => {
+  allPlayers = snapshot.val() || {};
+  drawMaze();
+  drawPlayers();
+});
+
+// Génération du labyrinthe
 class Cell {
   constructor(x, y) {
     this.x = x;
@@ -75,20 +102,19 @@ function generateMaze() {
   }
 
   function backtrack() {
-    let unvisitedNeighbors = [];
+    let unvisited = [];
     let dirs = [[0,-1],[1,0],[0,1],[-1,0]];
-
     for (let d of dirs) {
       let nx = current.x + d[0];
       let ny = current.y + d[1];
       let ni = index(nx, ny);
       if (ni !== -1 && !maze[ni].visited) {
-        unvisitedNeighbors.push(maze[ni]);
+        unvisited.push(maze[ni]);
       }
     }
 
-    if (unvisitedNeighbors.length > 0) {
-      let next = unvisitedNeighbors[Math.floor(Math.random() * unvisitedNeighbors.length)];
+    if (unvisited.length > 0) {
+      let next = unvisited[Math.floor(Math.random() * unvisited.length)];
       stack.push(current);
       removeWalls(current, next);
       current = next;
@@ -109,6 +135,21 @@ function drawMaze() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   for (let cell of maze) {
     cell.draw();
+  }
+}
+
+function drawPlayers() {
+  for (let id in allPlayers) {
+    const p = allPlayers[id];
+    ctx.fillStyle = p.color;
+    ctx.beginPath();
+    ctx.arc(
+      p.x * cellSize + cellSize / 2,
+      p.y * cellSize + cellSize / 2,
+      cellSize / 3,
+      0, Math.PI * 2
+    );
+    ctx.fill();
   }
 }
 
