@@ -5,19 +5,14 @@ const cols = 20;
 const cellSize = canvas.width / cols;
 let maze = [];
 
-// Firebase Realtime Database
 const db = firebase.database();
 const playerId = Math.random().toString(36).substring(2, 10);
 const playerRef = db.ref("players/" + playerId);
 
-// Position de départ et couleur aléatoire
 let player = { x: 0, y: 0, color: "#" + Math.floor(Math.random() * 16777215).toString(16) };
-
-// Enregistrer joueur dans la DB
 playerRef.set(player);
 playerRef.onDisconnect().remove();
 
-// Déplacement clavier
 document.addEventListener("keydown", (e) => {
   if (e.key === "ArrowUp") player.y = Math.max(0, player.y - 1);
   else if (e.key === "ArrowDown") player.y = Math.min(rows - 1, player.y + 1);
@@ -30,11 +25,10 @@ let allPlayers = {};
 
 db.ref("players").on("value", (snapshot) => {
   allPlayers = snapshot.val() || {};
-  drawMaze();
-  drawPlayers();
+  draw();
 });
 
-// Génération du labyrinthe
+// --- Maze logic ---
 class Cell {
   constructor(x, y) {
     this.x = x;
@@ -48,32 +42,18 @@ class Cell {
     const y = this.y * cellSize;
     ctx.strokeStyle = "#000";
     ctx.lineWidth = 2;
-
-    if (this.walls[0]) {
-      ctx.beginPath();
-      ctx.moveTo(x, y);
-      ctx.lineTo(x + cellSize, y);
-      ctx.stroke();
-    }
-    if (this.walls[1]) {
-      ctx.beginPath();
-      ctx.moveTo(x + cellSize, y);
-      ctx.lineTo(x + cellSize, y + cellSize);
-      ctx.stroke();
-    }
-    if (this.walls[2]) {
-      ctx.beginPath();
-      ctx.moveTo(x + cellSize, y + cellSize);
-      ctx.lineTo(x, y + cellSize);
-      ctx.stroke();
-    }
-    if (this.walls[3]) {
-      ctx.beginPath();
-      ctx.moveTo(x, y + cellSize);
-      ctx.lineTo(x, y);
-      ctx.stroke();
-    }
+    if (this.walls[0]) drawLine(x, y, x + cellSize, y);
+    if (this.walls[1]) drawLine(x + cellSize, y, x + cellSize, y + cellSize);
+    if (this.walls[2]) drawLine(x + cellSize, y + cellSize, x, y + cellSize);
+    if (this.walls[3]) drawLine(x, y + cellSize, x, y);
   }
+}
+
+function drawLine(x1, y1, x2, y2) {
+  ctx.beginPath();
+  ctx.moveTo(x1, y1);
+  ctx.lineTo(x2, y2);
+  ctx.stroke();
 }
 
 function index(x, y) {
@@ -82,59 +62,43 @@ function index(x, y) {
 }
 
 function generateMaze() {
-  for (let y = 0; y < rows; y++) {
-    for (let x = 0; x < cols; x++) {
+  maze = [];
+  for (let y = 0; y < rows; y++)
+    for (let x = 0; x < cols; x++)
       maze.push(new Cell(x, y));
-    }
-  }
 
   let stack = [];
   let current = maze[0];
   current.visited = true;
 
   function removeWalls(a, b) {
-    const dx = b.x - a.x;
-    const dy = b.y - a.y;
-    if (dx === 1) { a.walls[1] = false; b.walls[3] = false; }
-    else if (dx === -1) { a.walls[3] = false; b.walls[1] = false; }
-    if (dy === 1) { a.walls[2] = false; b.walls[0] = false; }
-    else if (dy === -1) { a.walls[0] = false; b.walls[2] = false; }
+    const dx = b.x - a.x, dy = b.y - a.y;
+    if (dx === 1) [a.walls[1], b.walls[3]] = [false, false];
+    if (dx === -1) [a.walls[3], b.walls[1]] = [false, false];
+    if (dy === 1) [a.walls[2], b.walls[0]] = [false, false];
+    if (dy === -1) [a.walls[0], b.walls[2]] = [false, false];
   }
 
-  function backtrack() {
-    let unvisited = [];
+  let total = cols * rows - 1;
+  while (total > 0) {
+    let neighbors = [];
     let dirs = [[0,-1],[1,0],[0,1],[-1,0]];
-    for (let d of dirs) {
-      let nx = current.x + d[0];
-      let ny = current.y + d[1];
+    for (let [dx, dy] of dirs) {
+      let nx = current.x + dx, ny = current.y + dy;
       let ni = index(nx, ny);
-      if (ni !== -1 && !maze[ni].visited) {
-        unvisited.push(maze[ni]);
-      }
+      if (ni !== -1 && !maze[ni].visited) neighbors.push(maze[ni]);
     }
 
-    if (unvisited.length > 0) {
-      let next = unvisited[Math.floor(Math.random() * unvisited.length)];
+    if (neighbors.length > 0) {
+      let next = neighbors[Math.floor(Math.random() * neighbors.length)];
       stack.push(current);
       removeWalls(current, next);
       current = next;
       current.visited = true;
-      setTimeout(backtrack, 10);
-    } else if (stack.length > 0) {
-      current = stack.pop();
-      setTimeout(backtrack, 10);
+      total--;
     } else {
-      drawMaze();
+      current = stack.pop();
     }
-  }
-
-  backtrack();
-}
-
-function drawMaze() {
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-  for (let cell of maze) {
-    cell.draw();
   }
 }
 
@@ -153,4 +117,11 @@ function drawPlayers() {
   }
 }
 
+function draw() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  for (let cell of maze) cell.draw();
+  drawPlayers();
+}
+
 generateMaze();
+draw();
